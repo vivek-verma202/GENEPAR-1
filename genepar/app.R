@@ -67,8 +67,10 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                     choices = names(df %>% select(where(is.double)))),
                                     box(width = 12, title = "Histogram",
                                         status = "primary",
-                                        plotlyOutput("hist"))
-                                    
+                                        plotlyOutput("hist")),
+                                    box(width = 12, title = "Box and whiskers plot",
+                                        status = "primary",
+                                        plotlyOutput("bwp")),
                                   ),
                                   box(
                                     selectInput(
@@ -100,7 +102,7 @@ tags$footer(HTML(
 # Define server logic ----
 server <- function(input, output) {
   output$tbl   <- renderUI({
-    SumProfile <- print(dfSummary(readRDS("GENEPAR1.RDS")),
+    SumProfile <- print(dfSummary(readRDS("GENEPAR1.RDS")[,-c(1)]),
                         omit.headings = T, method = 'render',
                         bootstrap.css = F)
     SumProfile})
@@ -117,8 +119,8 @@ server <- function(input, output) {
                geom_histogram(aes_string(fill = "..count..",
                                          color = "..count.."),
                               binwidth = bw) +
-               scale_fill_gradient(low="blue",high="pink") +
-               scale_color_gradient(low="blue",high="pink") +
+               scale_fill_gradient(low="cyan",high="pink") +
+               scale_color_gradient(low="cyan",high="pink") +
                xlab(input$contVar) + theme_bw() +
                theme(legend.position = "none"))
   })
@@ -130,10 +132,17 @@ server <- function(input, output) {
       summarise(count = n())
     ggplotly(ggplot(df1, aes(reorder(xvar,(-count)), y = count, fill = xvar)) +
                geom_bar(stat = "identity") + 
-               scale_fill_brewer(palette = "Set1") + 
+               scale_fill_brewer(palette = "Set3") + 
                xlab(input$catVar) + theme_bw() + 
                theme(legend.position = "none")
     )
+  })
+  
+  output$bwp <- renderPlotly({
+    df1 <- df %>% select(c("ID",input$contVar)) %>% 
+      drop_na() %>% rename("xvar"=input$contVar) %>%
+    plot_ly(x = "xvar", type = "box", boxpoints = "all",
+             jitter = 0.3)
   })
   
 }
