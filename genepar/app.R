@@ -13,10 +13,12 @@ df <- readRDS("GENEPAR1.RDS")
 ui <- tagList(dashboardPage(title="GENEPAR-1", 
                     skin = "black",
                     dashboardHeader(title = 
-                                      tags$a(href='https://www.humanpaingenetics.ca/',
-                                             alt='GENEPAR-1',
-                                             tags$img(src='logo.png',height=50,width=150,
-                                                      align = "centre")),titleWidth = 250),
+                                    HTML("<div class='header-logo'>
+                                          <a href='https://www.humanpaingenetics.ca/'>
+                                          <img src='logo.png' height='50px'/>
+                                          </a>
+                                          <h2><strong>Interactive Exploratory Data Analysis of GENEPAR-1</strong></h1>
+                                          </div>"),titleWidth = "100%"),
                     dashboardSidebar(
                       width = 250,
                       sidebarMenu(id = "MenuTabs",
@@ -39,6 +41,16 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                     column(10,
                                            align = "left",
                                            HTML("<style>
+                                                .header-logo {
+                                                  color: #ed1b2f;
+                                                  position: absolute;
+                                                  top: -7px;
+                                                  width: 100%;
+                                                }
+                                                .header-logo a {
+                                                    float: left;
+                                                    margin-top: 5px;
+                                                  }
                                                 .content {
                                                   background-color: white;
                                                 }
@@ -46,7 +58,6 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                   width:100%
                                                 }
                                                 </style>"),
-                                           h1(strong("Interactive Exploratory Data Analysis of GENEPAR-1")),
                                            HTML("<i>"),
                                            h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
                                            HTML("</i>"),
