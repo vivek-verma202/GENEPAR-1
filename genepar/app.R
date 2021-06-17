@@ -17,7 +17,6 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                              alt='GENEPAR-1',
                                              tags$img(src='logo.png',height=50,width=150,
                                                       align = "centre")),titleWidth = 250),
-                    #dashboardFooter(title = "Footer comes here...."),
                     dashboardSidebar(
                       width = 250,
                       sidebarMenu(id = "MenuTabs",
@@ -36,26 +35,37 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                       tabItems(
                         tabItem(tabName = "Home",
                                 fluidPage(
-                                  h1(strong("Interactive Exploratory Data Analysis of GENEPAR-1")),
-                                  HTML("<i>"),
-                                  h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
-                                  HTML("</i>"),
-                                  HTML("<div style='height: 5px;'>"),
-                                  HTML("</div>"),
-                                  htmlOutput('tbl'),
-                                  HTML("<div style='height: 15px;'>"),
-                                  HTML("</div>"),
-                                  h2(strong("Entire GENEPAR-1 dataset:")),
-                                  DTOutput("tbl1"),
-                                  HTML("</div>")
-                                )),
+                                  fixedRow(
+                                    column(10,
+                                           align = "left",
+                                           HTML("<style>
+                                                .content {
+                                                  background-color: white;
+                                                }
+                                                .st-table {
+                                                  width:100%
+                                                }
+                                                </style>"),
+                                           h1(strong("Interactive Exploratory Data Analysis of GENEPAR-1")),
+                                           HTML("<i>"),
+                                           h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
+                                           HTML("</i>"),
+                                           HTML("<div style='height: 5px;'>"),
+                                           HTML("</div>"),
+                                           htmlOutput('tbl'),
+                                           HTML("<div style='height: 15px;'>"),
+                                           HTML("</div>"),
+                                           h2(strong("Entire GENEPAR-1 dataset:")),
+                                           DTOutput("tbl1"),
+                                           HTML("<div style='display: block;padding-bottom:50px'>"),
+                                           HTML("</div>"))))),
                         tabItem(tabName = "uniCon",
                                 fluidRow(
                                   box(selectInput(
                                     inputId = "contVar",
                                     label = "Select a continuous variable:",
                                     choices = names(df %>% select(where(is.double)))),
-                                    box(width = 10, title = "Histogram",
+                                    box(width = 12, title = "Histogram",
                                         status = "primary",
                                         plotlyOutput("hist"))
                                     
@@ -65,20 +75,19 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                       inputId = "catVar",
                                       label = "Select a categorical variable:",
                                       choices = names(df %>% select(where(is.factor)))),
-                                    box(width = 10, title = "Barplot",
+                                    box(width = 12, title = "Barplot",
                                         status = "primary",
                                         plotlyOutput("bar"))
                                   )
                                 ))))
-                    
 ),
 tags$footer(HTML(
-              paste(icon("globe"),"<a href='https://www.humanpaingenetics.ca/' target='blank' style='padding-right:10px; padding-left:3px'>Human Pain Genetics Lab</a>"),
-              paste(icon("github"),"<a href='https://github.com/vivek-verma202/GENEPAR-1' target='blank' style='padding-right:10px; padding-left:3px'>Source code and license information</a>"),
-              paste(icon("envelope"),"<a href='mailto:vivek.verma@mail.mcgill.ca' style='padding-right:10px; padding-left:3px'>vivek.verma@mail.mcgill.ca</a>"),
-              paste(icon("copyright"),"<span style='padding-right:10px; padding-left:3px'>Vivek Verma</span>"),
-              paste(icon("balance-scale"),"<span style='padding-right:10px; padding-left:3px'>GNU General Public License v3.0</span>")), 
-              align = "center", style = "
+  paste(icon("globe"),"<a href='https://www.humanpaingenetics.ca/' target='blank' style='padding-right:10px; padding-left:3px'>Human Pain Genetics Lab</a>"),
+  paste(icon("github"),"<a href='https://github.com/vivek-verma202/GENEPAR-1' target='blank' style='padding-right:10px; padding-left:3px'>Source code and license information</a>"),
+  paste(icon("envelope"),"<a href='mailto:vivek.verma@mail.mcgill.ca' style='padding-right:10px; padding-left:3px'>vivek.verma@mail.mcgill.ca</a>"),
+  paste(icon("copyright"),"<span style='padding-right:10px; padding-left:3px'>Vivek Verma</span>"),
+  paste(icon("balance-scale"),"<span style='padding-right:10px; padding-left:3px'>GNU General Public License v3.0</span>")), 
+  align = "center", style = "
               position:fixed;
               bottom:0;
               width:100%;
