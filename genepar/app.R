@@ -10,13 +10,14 @@ df <- readRDS("GENEPAR1.RDS")
 
 # Define UI ----
 
-ui <- dashboardPage(title="GENEPAR-1", 
+ui <- tagList(dashboardPage(title="GENEPAR-1", 
                     skin = "black",
                     dashboardHeader(title = 
                                       tags$a(href='https://www.humanpaingenetics.ca/',
                                              alt='GENEPAR-1',
                                              tags$img(src='logo.png',height=50,width=150,
                                                       align = "centre")),titleWidth = 250),
+                    #dashboardFooter(title = "Footer comes here...."),
                     dashboardSidebar(
                       width = 250,
                       sidebarMenu(id = "MenuTabs",
@@ -35,64 +36,26 @@ ui <- dashboardPage(title="GENEPAR-1",
                       tabItems(
                         tabItem(tabName = "Home",
                                 fluidPage(
-                                  fixedRow(
-                                    column(10,
-                                           align = "left",
-                                           h1(strong("Interactive Exploratory Data Analysis of GENEPAR-1")),
-                                           HTML("<i>"),
-                                           h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
-                                           HTML("</i>"),
-                                           HTML("<div style='height: 5px;'>"),
-                                           HTML("</div>"),
-                                           htmlOutput('tbl'),
-                                           HTML("<div style='height: 15px;'>"),
-                                           HTML("</div>"),
-                                           h2(strong("Entire GENEPAR-1 dataset:")),
-                                           DTOutput("tbl1"),
-                                           HTML("<div style='display: block;float:left'>"),
-                                           h4("IEDA is a simple application and is easy to use. Follow the below series of simple steps
-            to utilise the tool."),
-                                           tags$ol(
-                                             tags$li(h4("Upload the dataset file in the selected format in the \"DataSource\" tab
-                      and click on submit.")),
-                                             tags$li(h4("On submit, you can do pre-processing of Data in the \"Data Processing\"
-                      Pane on the right side.")),
-                                             tags$li(h4("In the \"Data Strucure\" tab, you can view the strucure of data.")),
-                                             tags$li(h4("In the \"Data Preview\" tab, you can view the actual data.")),
-                                             tags$li(h4("In the \"Select Column Features\" tab, you can choose the feature of the
-                      columns.")),
-                                             tags$li(h4("Select Dimensions for Discrete or non continuous variables")),
-                                             tags$li(h4("Select Measures for Continuous variables")),
-                                             tags$li(h4("Select Exclude to exclude the variable in the EDA")),
-                                             tags$li(h4("Once the pre-processing is completed, click on Explore button on the
-                      bottom in the \"Select Column Features\" tab.")),
-                                             tags$li(h4("On clicking the \"Explore Button\", Seven different interactive
-                      visualizations with options are presented and can be accessed in the
-                      sidebar panel."))),
-                                           HTML("<div style='height: 5px;'>"),
-                                           HTML("</div>"),
-                                           h3("Human Pain Genetics Lab:"),
-                                           HTML(paste(icon("globe","fa-2x"),"https://www.humanpaingenetics.ca/")),
-                                           HTML("<div style='height: 5px;'>"),
-                                           HTML("</div>"),
-                                           h3("Source code and license information:"),
-                                           HTML(paste(icon("github"),"https://github.com/vivek-verma202/GENEPAR-1")),
-                                           HTML("<div style='height: 5px;'>"),
-                                           HTML("</div>"),
-                                           h3("Contact:"),
-                                           HTML(paste(icon("envelope"),"vivek.verma@mail.mcgill.ca")),
-                                           HTML(paste(icon("copyright"),"Vivek Verma  ")),
-                                           HTML(paste(icon("  balance-scale"),"GNU General Public License v3.0")),
-                                           HTML("<div style='height: 5px;'>"),
-                                           HTML("</div>"),
-                                           HTML("</div>"))))),
+                                  h1(strong("Interactive Exploratory Data Analysis of GENEPAR-1")),
+                                  HTML("<i>"),
+                                  h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
+                                  HTML("</i>"),
+                                  HTML("<div style='height: 5px;'>"),
+                                  HTML("</div>"),
+                                  htmlOutput('tbl'),
+                                  HTML("<div style='height: 15px;'>"),
+                                  HTML("</div>"),
+                                  h2(strong("Entire GENEPAR-1 dataset:")),
+                                  DTOutput("tbl1"),
+                                  HTML("</div>")
+                                )),
                         tabItem(tabName = "uniCon",
                                 fluidRow(
                                   box(selectInput(
                                     inputId = "contVar",
                                     label = "Select a continuous variable:",
                                     choices = names(df %>% select(where(is.double)))),
-                                    box(width = 12, title = "Histogram",
+                                    box(width = 10, title = "Histogram",
                                         status = "primary",
                                         plotlyOutput("hist"))
                                     
@@ -102,12 +65,28 @@ ui <- dashboardPage(title="GENEPAR-1",
                                       inputId = "catVar",
                                       label = "Select a categorical variable:",
                                       choices = names(df %>% select(where(is.factor)))),
-                                    box(width = 12, title = "Barplot",
+                                    box(width = 10, title = "Barplot",
                                         status = "primary",
                                         plotlyOutput("bar"))
                                   )
                                 ))))
-)
+                    
+),
+tags$footer(HTML(
+              paste(icon("globe"),"<a href='https://www.humanpaingenetics.ca/' target='blank' style='padding-right:10px; padding-left:3px'>Human Pain Genetics Lab</a>"),
+              paste(icon("github"),"<a href='https://github.com/vivek-verma202/GENEPAR-1' target='blank' style='padding-right:10px; padding-left:3px'>Source code and license information</a>"),
+              paste(icon("envelope"),"<a href='mailto:vivek.verma@mail.mcgill.ca' style='padding-right:10px; padding-left:3px'>vivek.verma@mail.mcgill.ca</a>"),
+              paste(icon("copyright"),"<span style='padding-right:10px; padding-left:3px'>Vivek Verma</span>"),
+              paste(icon("balance-scale"),"<span style='padding-right:10px; padding-left:3px'>GNU General Public License v3.0</span>")), 
+              align = "center", style = "
+              position:fixed;
+              bottom:0;
+              width:100%;
+              height:50px;   /* Height of the footer */
+              color: white;
+              padding: 10px;
+              background-color: #222d32;
+              z-index: 1000;"))
 
 # Define server logic ----
 server <- function(input, output) {
