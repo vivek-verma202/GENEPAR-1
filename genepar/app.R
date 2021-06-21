@@ -23,9 +23,9 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                       width = 250,
                       sidebarMenu(id = "MenuTabs",
                                   menuItem("Home", tabName = "Home", icon = icon("home")),
-                                  menuItem("Univariate Analysis (Continuous)", tabName = "uniCon", icon = icon("chart-area")),
-                                  menuItem("Univariate Analysis", tabName = "Univariate", icon = icon("bar-chart")),
-                                  menuItem("Bi Variate Scatter Plot", tabName = "ScatterPlot", icon = icon("dot-circle-o")),
+                                  menuItem("Univariate Analyses", tabName = "uniCon", icon = icon("chart-area")),
+                                  menuItem("Bivariate Analyses", tabName = "Univariate", icon = icon("bar-chart")),
+                                  menuItem("Multivariate Analyses", tabName = "ScatterPlot", icon = icon("dot-circle-o")),
                                   menuItem("Bi Variate Box Plot", tabName = "BoxPlot", icon = icon("sliders")),
                                   menuItem("Bi Variate Group Bar Plot", tabName = "GBarPlot", icon = icon("bar-chart")),
                                   menuItem("Bi Variate Group Histogram", tabName = "GHistPlot", icon = icon("area-chart")),
@@ -42,7 +42,7 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                            align = "left",
                                            HTML("<style>
                                                 .header-logo {
-                                                  color: #ed1b2f;
+                                                  color: #B0361B;
                                                   position: absolute;
                                                   top: -7px;
                                                   width: 100%;
@@ -76,6 +76,7 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                     inputId = "contVar",
                                     label = "Select a continuous variable:",
                                     choices = names(df %>% select(where(is.double)))),
+                                    verbatimTextOutput('tbl2a'),
                                     box(width = 12, title = "Histogram",
                                         status = "primary",
                                         plotlyOutput("hist")),
@@ -88,9 +89,13 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                       inputId = "catVar",
                                       label = "Select a categorical variable:",
                                       choices = names(df %>% select(where(is.factor)))),
+                                    verbatimTextOutput('tbl2b'),
                                     box(width = 12, title = "Barplot",
                                         status = "primary",
-                                        plotlyOutput("bar"))
+                                        plotlyOutput("bar")),
+                                    box(width = 12, title = "Piechart",
+                                        status = "primary",
+                                        plotlyOutput("pie"))
                                   )
                                 ))))
 ),
@@ -121,7 +126,6 @@ server <- function(input, output) {
   x <- reactive({
     df %>% select(input$contVar) %>% drop_na(input$contVar)
   })
-  #bw <- reactive({2*IQR(x())/length(x())^(1/3)})
   output$hist  <- renderPlotly({
     df1 <- df %>% select(input$contVar) %>% 
       drop_na() %>% rename("xvar"=input$contVar)
@@ -130,8 +134,8 @@ server <- function(input, output) {
                geom_histogram(aes_string(fill = "..count..",
                                          color = "..count.."),
                               binwidth = bw) +
-               scale_fill_gradient(low="cyan",high="pink") +
-               scale_color_gradient(low="cyan",high="pink") +
+               scale_fill_gradient(low="blue",high="pink") +
+               scale_color_gradient(low="blue",high="pink") +
                xlab(input$contVar) + theme_bw() +
                theme(legend.position = "none"))
   })
@@ -149,13 +153,53 @@ server <- function(input, output) {
     )
   })
   
-  output$bwp <- renderPlotly({
-    df1 <- df %>% select(c("ID",input$contVar)) %>% 
-      drop_na() %>% rename("xvar"=input$contVar) %>%
-    plot_ly(x = "xvar", type = "box", boxpoints = "all",
-             jitter = 0.3)
+  output$pie  <- renderPlotly({
+    df1 <- df %>% select(input$catVar) %>% 
+      rename("xvar"=input$catVar) %>%
+      group_by(xvar) %>% 
+      summarise(count = n())
+    fig <- plot_ly(df1, labels = ~xvar, values = ~count, type = 'pie',
+                   textposition = 'inside',
+                   textinfo = 'label+percent',
+                   insidetextfont = list(color = '#FFFFFF'),
+                   hoverinfo = 'text',
+                   showlegend = F) %>% layout(title = input$catVar,
+                          xaxis = list(showgrid = F, zeroline = F, showticklabels = F),
+                          yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
+    
+    fig
   })
   
+  output$bwp <- renderPlotly({
+    df1 <- df %>% select(c("ID",input$contVar)) %>% 
+      drop_na() %>% rename("xvar"=input$contVar)
+      ggplotly(
+        ggplot(data = df1,aes(x = 1,y = xvar)) +
+          geom_boxplot(colour = "black",lwd=1.5,fill = "cyan") + 
+          geom_jitter(aes(text = ID),width = 0.2, alpha = 0.4) +
+          ylab(input$contVar) +
+          coord_flip() +
+          theme_classic() + 
+          theme(axis.line = element_line(colour = 'black', size = 2),
+                axis.ticks.y = element_blank(),
+                axis.ticks.x = element_line(colour = "black", size = 2),
+                axis.text.x = element_text(color = "black", size = 20),
+                axis.text.y = element_blank(),
+                axis.title.x = element_text(color = "black", size = 0),
+                axis.title.y = element_blank(),
+                legend.position = "none")
+      )
+  })
+  
+  output$tbl2a   <- renderPrint({
+    df %>% select(input$contVar) %>% summary() %>% 
+      print(method = 'render',bootstrap.css = F)
+    })
+
+  output$tbl2b   <- renderPrint({
+    df %>% select(input$catVar) %>% summary() %>% 
+      print(method = 'render',bootstrap.css = F)
+  })
 }
 
 # Run the app ----
