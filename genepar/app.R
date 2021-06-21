@@ -24,14 +24,11 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                       sidebarMenu(id = "MenuTabs",
                                   menuItem("Home", tabName = "Home", icon = icon("home")),
                                   menuItem("Univariate Analyses", tabName = "uniCon", icon = icon("chart-area")),
-                                  menuItem("Bivariate Analyses", tabName = "Univariate", icon = icon("bar-chart")),
-                                  menuItem("Multivariate Analyses", tabName = "ScatterPlot", icon = icon("dot-circle-o")),
-                                  menuItem("Bi Variate Box Plot", tabName = "BoxPlot", icon = icon("sliders")),
-                                  menuItem("Bi Variate Group Bar Plot", tabName = "GBarPlot", icon = icon("bar-chart")),
-                                  menuItem("Bi Variate Group Histogram", tabName = "GHistPlot", icon = icon("area-chart")),
-                                  menuItem("Multi Variate Scatter Plot", tabName = "MultiScatterPlot", icon = icon("dot-circle-o")),
-                                  menuItem("Multi Variate Box Plot", tabName = "MultiBoxPlot", icon = icon("sliders")),
-                                  menuItem("EDA", tabName = "EDA", icon = icon("info-circle"))
+                                  menuItem("Bivariate Analyses", tabName = "biVar", icon = icon("bar-chart")),
+                                  menuItem("Multivariate Analyses", tabName = "multiVar", icon = icon("sliders")),
+                                  menuItem("Filters", tabName = "fil", icon = icon("filter")),
+                                  menuItem("Documents", tabName = "docu", icon = icon("file-download"))
+                                  
                       )),
                     dashboardBody(
                       tabItems(
@@ -57,17 +54,22 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                 .st-table {
                                                   width:100%
                                                 }
+                                                .footer {
+                                                  width: 80%;
+                                                  float: right;
+                                                }
                                                 </style>"),
                                            HTML("<i>"),
                                            h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
                                            HTML("</i>"),
                                            HTML("<div style='height: 5px;'>"),
                                            HTML("</div>"),
-                                           htmlOutput('tbl'),
+                                           h2(strong("GENEPAR-1 dataset: Variable description")),
+                                           dataTableOutput('tbl'),
                                            HTML("<div style='height: 15px;'>"),
                                            HTML("</div>"),
-                                           h2(strong("Entire GENEPAR-1 dataset:")),
-                                           DTOutput("tbl1"),
+                                           h2(strong("GENEPAR-1 dataset: Summary of all variables")),
+                                           htmlOutput("tbl1"),
                                            HTML("<div style='display: block;padding-bottom:50px'>"),
                                            HTML("</div>"))))),
                         tabItem(tabName = "uniCon",
@@ -77,9 +79,12 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                     label = "Select a continuous variable:",
                                     choices = names(df %>% select(where(is.double)))),
                                     verbatimTextOutput('tbl2a'),
-                                    box(width = 12, title = "Histogram",
+                                    box(width = 9, title = "Histogram",
                                         status = "primary",
                                         plotlyOutput("hist")),
+                                    box(width = 3, title = "Q-Q Plot",
+                                        status = "primary",
+                                        plotlyOutput("qqp")),
                                     box(width = 12, title = "Box and whiskers plot",
                                         status = "primary",
                                         plotlyOutput("bwp")),
@@ -97,39 +102,64 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                         status = "primary",
                                         plotlyOutput("pie"))
                                   )
-                                ))))
+                                )),
+                        tabItem(tabName = "biVar",
+                                fluidRow(box())),
+                        tabItem(tabName = "multiVar",
+                                fluidRow(box(width = 3,
+                                             selectInput(
+                                               inputId = "x",
+                                               label = "Select X variable:",
+                                               choices = names(df %>% select(where(is.double)))),
+                                             selectInput(
+                                               inputId = "y",
+                                               label = "Select Y variable:",
+                                               choices = names(df %>% select(where(is.double)))),
+                                             selectInput(
+                                               inputId = "z",
+                                               label = "Select Z variable:",
+                                               choices = names(df %>% select(where(is.double))))),
+                                         box(width = 9, title = "3D Surface Plot",
+                                             status = "primary",
+                                             plotlyOutput("p3d")))),
+                        tabItem(tabName = "fil",
+                                fluidRow(box())),
+                        tabItem(tabName = "docu",
+                                fluidRow(box(width = 12,
+                                             h2(strong("GENEPAR-1 - Supporting files")),
+                                             h3(strong("1. Entire GENEPAR-1 dataset")),
+                                             )))
+                        ))
 ),
-tags$footer(HTML(
+tags$footer(HTML("<div class='footer'>",
   paste(icon("globe"),"<a href='https://www.humanpaingenetics.ca/' target='blank' style='padding-right:10px; padding-left:3px'>Human Pain Genetics Lab</a>"),
   paste(icon("github"),"<a href='https://github.com/vivek-verma202/GENEPAR-1' target='blank' style='padding-right:10px; padding-left:3px'>Source code and license information</a>"),
   paste(icon("envelope"),"<a href='mailto:vivek.verma@mail.mcgill.ca' style='padding-right:10px; padding-left:3px'>vivek.verma@mail.mcgill.ca</a>"),
   paste(icon("copyright"),"<span style='padding-right:10px; padding-left:3px'>Vivek Verma</span>"),
-  paste(icon("balance-scale"),"<span style='padding-right:10px; padding-left:3px'>GNU General Public License v3.0</span>")), 
+  paste(icon("balance-scale"),"<span style='padding-right:10px; padding-left:3px'>GNU General Public License v3.0</span></div>")), 
   align = "center", style = "
-              position:fixed;
               bottom:0;
               width:100%;
               height:50px;   /* Height of the footer */
               color: white;
               padding: 10px;
-              background-color: #222d32;
-              z-index: 1000;"))
+              background-color: #222d32;"))
 
 # Define server logic ----
 server <- function(input, output) {
-  output$tbl   <- renderUI({
+  
+  output$tbl <- renderDataTable(read.delim("DICTIONARY.txt"))
+  
+  output$tbl1  <- renderUI({
     SumProfile <- print(dfSummary(readRDS("GENEPAR1.RDS")[,-c(1)]),
                         omit.headings = T, method = 'render',
                         bootstrap.css = F)
     SumProfile})
-  output$tbl1  <- renderDT({df})
-  x <- reactive({
-    df %>% select(input$contVar) %>% drop_na(input$contVar)
-  })
+  
   output$hist  <- renderPlotly({
     df1 <- df %>% select(input$contVar) %>% 
       drop_na() %>% rename("xvar"=input$contVar)
-    bw <- 2*IQR(df1$xvar)/length(df1$xvar)^(1/3)
+    bw <- 3*IQR(df1$xvar)/length(df1$xvar)^(1/3)
     ggplotly(ggplot(df1, aes(x = xvar)) + 
                geom_histogram(aes_string(fill = "..count..",
                                          color = "..count.."),
@@ -138,7 +168,7 @@ server <- function(input, output) {
                scale_color_gradient(low="blue",high="pink") +
                xlab(input$contVar) + theme_bw() +
                theme(legend.position = "none"))
-  })
+  }) 
   
   output$bar  <- renderPlotly({
     df1 <- df %>% select(input$catVar) %>% 
@@ -151,7 +181,7 @@ server <- function(input, output) {
                xlab(input$catVar) + theme_bw() + 
                theme(legend.position = "none")
     )
-  })
+  }) 
   
   output$pie  <- renderPlotly({
     df1 <- df %>% select(input$catVar) %>% 
@@ -168,7 +198,7 @@ server <- function(input, output) {
                           yaxis = list(showgrid = F, zeroline = F, showticklabels = F))
     
     fig
-  })
+  }) 
   
   output$bwp <- renderPlotly({
     df1 <- df %>% select(c("ID",input$contVar)) %>% 
@@ -189,16 +219,29 @@ server <- function(input, output) {
                 axis.title.y = element_blank(),
                 legend.position = "none")
       )
-  })
+  }) 
   
   output$tbl2a   <- renderPrint({
     df %>% select(input$contVar) %>% summary() %>% 
       print(method = 'render',bootstrap.css = F)
-    })
+    }) 
+  output$qqp   <- renderPlotly({
+    df1 <- df %>% select(c("ID",input$contVar)) %>% 
+      drop_na() %>% rename("xvar"=input$contVar)
+    ggplotly(
+      ggplot(data = df1,aes(sample = xvar)) +
+        geom_qq() + geom_qq_line() +
+        labs(title = "Q-Q Plot") +
+        theme_classic()
+      )
+  }) 
 
   output$tbl2b   <- renderPrint({
     df %>% select(input$catVar) %>% summary() %>% 
       print(method = 'render',bootstrap.css = F)
+  }) 
+  output$p3d  <- renderPlotly({
+    plot_ly(z = ~volcano, type = "scatter3d")
   })
 }
 
