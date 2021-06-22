@@ -128,7 +128,7 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                     fluidRow(
                                       box(width = 12,
                                           title = "Kendall's Tau Correlation Matrix",
-                                          plotlyOutput("cp", height = 800)),
+                                          plotlyOutput("cp", height = 800, width = 1200)),
                                       box(width = 3,
                                           selectInput(
                                           inputId = "x",
@@ -155,7 +155,7 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                              box(
                                                selectInput(
                                                  inputId = "y1",
-                                                 label = "Select Y variable:",
+                                                 label = "Color by:",
                                                  choices = sort(names(df %>% select(where(is.factor))))
                                                )),
                                              box(title = "Stacked bar plot",
@@ -204,15 +204,15 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                              selectInput(
                                                inputId = "x",
                                                label = "Select X variable:",
-                                               choices = names(df %>% select(where(is.double)))),
+                                               choices = "SCORE_DN4"),
                                              selectInput(
                                                inputId = "y",
                                                label = "Select Y variable:",
-                                               choices = names(df %>% select(where(is.double)))),
+                                               choices = "SCORE_SCL90R"),
                                              selectInput(
                                                inputId = "z",
                                                label = "Select Z variable:",
-                                               choices = names(df %>% select(where(is.double))))),
+                                               choices = "LBP_NRS")),
                                          box(width = 9, title = "3D Surface Plot",
                                              status = "primary",
                                              HTML('<img src="test.gif" style="width:60%" />')))),
@@ -229,17 +229,17 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                        HTML("<h3><strong>Download Links</strong></h3>"),
                                        HTML("<ul class='download-links'>"),
                                        HTML("<li>",
-                                       paste("<a href='LBP_extraction.xlsx' target='blank'>Entire Genepar-1 dataset", icon("database", class='icon-download')), "</a></li>"),
+                                       paste("<a href='LBP_extraction.xlsx' target='blank'>Entire Genepar-1 dataset", icon("file-excel", class='icon-download')), "</a></li>"),
                                        HTML("<li>",
-                                            paste("<a href='DICTIONARY.txt' target='blank'>Dictionary", icon("book-open", class='icon-download')), "</a></li>"),
+                                            paste("<a href='DICTIONARY.txt' target='blank'>Dictionary", icon("file-alt", class='icon-download')), "</a></li>"),
                                        HTML("<li>",
                                             paste("<a href='GENEPAR-1.txt' target='blank'>GENEPAR-1", icon("file-alt", class='icon-download')), "</a></li>"),
                                        HTML("<li>",
-                                            paste("<a href='List_variables_GENEPAR_final.xlsx' target='blank'>List variables GENEPAR final", icon("list-ul", class='icon-download')), "</a></li>"),
+                                            paste("<a href='List_variables_GENEPAR_final.xlsx' target='blank'>List variables GENEPAR final", icon("file-excel", class='icon-download')), "</a></li>"),
                                        HTML("<li>",
-                                            paste("<a href='QPR_code_book_2014.pdf' target='blank'>QPR code book(2014)", icon("book", class='icon-download')), "</a></li>"),
+                                            paste("<a href='QPR_code_book_2014.pdf' target='blank'>QPR code book (2014)", icon("file-pdf", class='icon-download')), "</a></li>"),
                                        HTML("<li>",
-                                            paste("<a href='QUESTION_EN.docx' target='blank'>Questionnaire(EN)", icon("question-circle", class='icon-download')), "</a></li>"),
+                                            paste("<a href='QUESTION_EN.docx' target='blank'>Questionnaire (EN)", icon("file-word", class='icon-download')), "</a></li>"),
                                        HTML("</ul>")
                                        
                                        )
@@ -377,8 +377,8 @@ server <- function(input, output) {
         geom_smooth(aes(color = zvar)) +
         labs(x = input$x, y = input$y, color = input$z) +
         theme_classic() +
-        scale_fill_brewer(palette = "Set3") +
-        scale_color_brewer(palette = "Set3"), height = 430
+        scale_fill_brewer(palette = "Set2") +
+        scale_color_brewer(palette = "Set2"), height = 430
     )
   })
   output$br1 <- renderPlotly({
@@ -388,7 +388,7 @@ server <- function(input, output) {
       ggplot(df1, aes(x=xvar,fill=yvar)) +
         geom_bar(position = "stack",color = "black", lwd = 0.5) +
         labs(x = input$x1, y = "ratio") +
-        scale_fill_brewer(palette = "Set3") +
+        scale_fill_brewer(palette = "Set1") +
         theme_classic()
     )
   })
@@ -399,7 +399,7 @@ server <- function(input, output) {
       ggplot(df1, aes(x=xvar,fill=yvar)) +
         geom_bar(position = "dodge",color = "black", lwd = 0.5) +
         labs(x = input$x1) +
-        scale_fill_brewer(palette = "Set3") +
+        scale_fill_brewer(palette = "Set1") +
         theme_classic()
     )
   })
@@ -410,7 +410,7 @@ server <- function(input, output) {
       ggplot(df1, aes(x=xvar,fill=yvar)) +
         geom_bar(position = "fill",color = "black", lwd = 0.5) +
         labs(x = input$x1, y = "ratio") +
-        scale_fill_brewer(palette = "Set3") +
+        scale_fill_brewer(palette = "Set1") +
         theme_classic()
     )
   })
@@ -421,7 +421,7 @@ server <- function(input, output) {
       ggplot(df1, aes(x=yvar,fill=xvar)) +
         geom_density(alpha = 0.4) +
         labs(x = input$y2) +
-        scale_fill_brewer(palette = "Set3") +
+        scale_fill_brewer(palette = "Set1") +
         theme_classic()
     )
   })
@@ -434,7 +434,7 @@ server <- function(input, output) {
         geom_jitter(aes(text = ID),width = 0.2, alpha = 0.4) +
         labs(x = input$x2, y = input$y2) +
         scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-        scale_fill_brewer(palette = "Set3") +
+        scale_fill_brewer(palette = "Set1") +
         theme_classic() + 
         theme(axis.line = element_line(colour = 'black', size = 1),
               axis.ticks = element_line(colour = "black", size = 1),
