@@ -40,6 +40,9 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                     column(10,
                                            align = "left",
                                            HTML("<style>
+                                                .content-wrapper {
+                                                  min-height: 620px !important;
+                                                }
                                                 .header-logo {
                                                   color: #B0361B;
                                                   position: absolute;
@@ -62,6 +65,16 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                 }
                                                 pre {
                                                   height: 150px;
+                                                }
+                                                .download-links li {
+                                                  font-size: 20px;
+                                                  font-weight: bold;
+                                                  width: 40%;
+                                                  padding-bottom: 4px;
+                                                }
+                                                .download-links i {
+                                                  padding-left: 20px;
+                                                  float: right;
                                                 }
                                                 </style>"),
                                            HTML("<i>"),
@@ -202,14 +215,35 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                choices = names(df %>% select(where(is.double))))),
                                          box(width = 9, title = "3D Surface Plot",
                                              status = "primary",
-                                             HTML('<img src="test.gif" style="width:80%" />')))),
+                                             HTML('<img src="test.gif" style="width:60%" />')))),
                         tabItem(tabName = "fil",
-                                fluidRow()),
+                                fluidRow(
+                                  HTML('<img src="filter.gif" style="padding-left:30%" />')
+                                )),
                         tabItem(tabName = "docu",
-                                fluidRow(box(width = 12,
-                                             h2(strong("GENEPAR-1 - Supporting files")),
-                                             h3(strong("1. Entire GENEPAR-1 dataset")),
-                                             )))
+                                fluidPage(
+                                  fixedRow(
+                                    column(10,
+                                           align = "left",
+                                          
+                                       HTML("<h3><strong>Download Links</strong></h3>"),
+                                       HTML("<ul class='download-links'>"),
+                                       HTML("<li>",
+                                       paste("<a href='LBP_extraction.xlsx' target='blank'>Entire Genepar-1 dataset", icon("database", class='icon-download')), "</a></li>"),
+                                       HTML("<li>",
+                                            paste("<a href='DICTIONARY.txt' target='blank'>Dictionary", icon("book-open", class='icon-download')), "</a></li>"),
+                                       HTML("<li>",
+                                            paste("<a href='GENEPAR-1.txt' target='blank'>GENEPAR-1", icon("file-alt", class='icon-download')), "</a></li>"),
+                                       HTML("<li>",
+                                            paste("<a href='List_variables_GENEPAR_final.xlsx' target='blank'>List variables GENEPAR final", icon("list-ul", class='icon-download')), "</a></li>"),
+                                       HTML("<li>",
+                                            paste("<a href='QPR_code_book_2014.pdf' target='blank'>QPR code book(2014)", icon("book", class='icon-download')), "</a></li>"),
+                                       HTML("<li>",
+                                            paste("<a href='QUESTION_EN.docx' target='blank'>Questionnaire(EN)", icon("question-circle", class='icon-download')), "</a></li>"),
+                                       HTML("</ul>")
+                                       
+                                       )
+                                       )))
                         ))
 ),
 tags$footer(HTML("<div class='footer'>",
@@ -396,14 +430,16 @@ server <- function(input, output) {
       rename("xvar"=input$x2,"yvar"=input$y2)
     ggplotly(
       ggplot(data = df1,aes(x = xvar,y = yvar)) +
-        geom_boxplot(colour = "black",lwd=1) + 
+        geom_boxplot(aes(fill = xvar),colour = "black",lwd=1) + 
         geom_jitter(aes(text = ID),width = 0.2, alpha = 0.4) +
         labs(x = input$x2, y = input$y2) +
+        scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+        scale_fill_brewer(palette = "Set3") +
         theme_classic() + 
         theme(axis.line = element_line(colour = 'black', size = 1),
               axis.ticks = element_line(colour = "black", size = 1),
               axis.text = element_text(color = "black", size = 15),
-              axis.title = element_text(color = "black", size = 20),
+              axis.title = element_text(color = "black", size = 10),
               legend.position = "right")
     )
     })
