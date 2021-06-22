@@ -6,6 +6,8 @@ library(plotly)
 library(RColorBrewer)
 library(cowplot)
 library(tidyverse)
+library(heatmaply)
+library(ggcorrplot)
 df <- readRDS("GENEPAR1.RDS")
 
 # Define UI ----
@@ -58,6 +60,9 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                   width: 80%;
                                                   float: right;
                                                 }
+                                                pre {
+                                                  height: 150px;
+                                                }
                                                 </style>"),
                                            HTML("<i>"),
                                            h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
@@ -77,23 +82,23 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                   box(selectInput(
                                     inputId = "contVar",
                                     label = "Select a continuous variable:",
-                                    choices = names(df %>% select(where(is.double)))),
+                                    choices = sort(names(df %>% select(where(is.double))))),
                                     verbatimTextOutput('tbl2a'),
                                     box(width = 9, title = "Histogram",
                                         status = "primary",
                                         plotlyOutput("hist")),
-                                    box(width = 3, title = "Q-Q Plot",
+                                    box(width = 3, title = "QQ Plot",
                                         status = "primary",
                                         plotlyOutput("qqp")),
                                     box(width = 12, title = "Box and whiskers plot",
                                         status = "primary",
-                                        plotlyOutput("bwp")),
+                                        plotlyOutput("bwp"))
                                   ),
                                   box(
                                     selectInput(
                                       inputId = "catVar",
                                       label = "Select a categorical variable:",
-                                      choices = names(df %>% select(where(is.factor)))),
+                                      choices = sort(names(df %>% select(where(is.factor))))),
                                     verbatimTextOutput('tbl2b'),
                                     box(width = 12, title = "Barplot",
                                         status = "primary",
@@ -104,7 +109,31 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                   )
                                 )),
                         tabItem(tabName = "biVar",
-                                fluidRow(box())),
+                                fluidRow(tabBox(
+                                  width = "12",
+                                  tabPanel(HTML("<strong>Continuous or Ordinal Variables</strong>"),
+                                    fluidRow(
+                                      box(width = 12,
+                                          title = "Kendall's Tau Correlation Matrix",
+                                          plotlyOutput("cp", height = 800)),
+                                      box(width = 3,
+                                          selectInput(
+                                          inputId = "x",
+                                          label = "Select X variable:",
+                                          choices = sort(names(df %>% select(where(is.numeric) | where(is.ordered))))),
+                                          selectInput(
+                                            inputId = "y",
+                                            label = "Select Y variable:",
+                                            choices = sort(names(df %>% select(where(is.numeric) | where(is.ordered))))),
+                                          selectInput(
+                                            inputId = "z",
+                                            label = "Color by:",
+                                            choices = sort(names(df %>% select(where(is.factor)))))),
+                                      box(width = 9,title = "Scatterplot",
+                                          plotlyOutput("sp")))),
+                                  tabPanel(HTML("<strong>Categorical Variables</strong>"), "Tab content 2"),
+                                  tabPanel(HTML("<strong>Categorical and Continuous Variables</strong>"), "Tab content 3")
+                                ))),
                         tabItem(tabName = "multiVar",
                                 fluidRow(box(width = 3,
                                              selectInput(
@@ -121,9 +150,9 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                choices = names(df %>% select(where(is.double))))),
                                          box(width = 9, title = "3D Surface Plot",
                                              status = "primary",
-                                             plotlyOutput("p3d")))),
+                                             HTML('<img src="test.gif" style="width:80%" />')))),
                         tabItem(tabName = "fil",
-                                fluidRow(box())),
+                                fluidRow()),
                         tabItem(tabName = "docu",
                                 fluidRow(box(width = 12,
                                              h2(strong("GENEPAR-1 - Supporting files")),
@@ -230,9 +259,10 @@ server <- function(input, output) {
       drop_na() %>% rename("xvar"=input$contVar)
     ggplotly(
       ggplot(data = df1,aes(sample = xvar)) +
-        geom_qq() + geom_qq_line() +
-        labs(title = "Q-Q Plot") +
-        theme_classic()
+        geom_qq(alpha = 0.2, size = 0.5) + geom_qq_line() +
+        theme_minimal() +
+        theme(axis.ticks = element_blank(),
+              axis.text = element_blank()), height = 150, width = 150
       )
   }) 
 
@@ -242,6 +272,26 @@ server <- function(input, output) {
   }) 
   output$p3d  <- renderPlotly({
     plot_ly(z = ~volcano, type = "scatter3d")
+  })
+  
+  output$cp <- renderPlotly({
+    df1 <- df %>% select(where(is.numeric) | where(is.ordered)) %>% sapply(as.numeric)
+    heatmaply_cor(
+      cor(df1, use = "pairwise.complete.obs", method = "kendall"),
+      k_col = 2, k_row = 2)
+  })
+  
+  output$sp <- renderPlotly({
+    df1 <- df %>% select(c("ID",input$x,input$y,input$z)) %>% 
+      rename("xvar"=input$x,"yvar"=input$y,"zvar"=input$z)
+    df1[,c("xvar","yvar")] <- sapply(df1[,c("xvar","yvar")],as.numeric)
+    ggplotly(
+      ggplot(df1, aes(x=xvar,y=yvar)) +
+        geom_jitter(aes(text=ID,color = zvar),width = 0.5) +
+        geom_smooth(aes(color = zvar)) +
+        labs(x = input$x, y = input$y, color = input$z) +
+        theme_classic(), height = 430
+    )
   })
 }
 
