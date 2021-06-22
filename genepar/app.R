@@ -131,8 +131,60 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                             choices = sort(names(df %>% select(where(is.factor)))))),
                                       box(width = 9,title = "Scatterplot",
                                           plotlyOutput("sp")))),
-                                  tabPanel(HTML("<strong>Categorical Variables</strong>"), "Tab content 2"),
-                                  tabPanel(HTML("<strong>Categorical and Continuous Variables</strong>"), "Tab content 3")
+                                  tabPanel(HTML("<strong>Categorical Variables</strong>"),
+                                           fluidRow(
+                                             box(
+                                               selectInput(
+                                               inputId = "x1",
+                                               label = "Select X variable:",
+                                               choices = sort(names(df %>% select(where(is.factor))))
+                                               )),
+                                             box(
+                                               selectInput(
+                                                 inputId = "y1",
+                                                 label = "Select Y variable:",
+                                                 choices = sort(names(df %>% select(where(is.factor))))
+                                               )),
+                                             box(title = "Stacked bar plot",
+                                               width = 12,
+                                               plotlyOutput("br1")
+                                             ),
+                                             box(title = "Grouped bar plot",
+                                               width = 12,
+                                               plotlyOutput("br2")
+                                             ),
+                                             box(title = "Segmented bar plot",
+                                               width = 12,
+                                               plotlyOutput("br3")
+                                             )
+                                             )),
+                                  tabPanel(HTML("<strong>Categorical vs. Continuous Variables</strong>"),
+                                           fluidRow(
+                                             box(
+                                               selectInput(
+                                                 inputId = "x2",
+                                                 label = "Select a categorical variable:",
+                                                 choices = sort(names(df %>% select(where(is.factor))))
+                                               )),
+                                             box(
+                                               selectInput(
+                                                 inputId = "y2",
+                                                 label = "Select a continuous variable:",
+                                                 choices = sort(names(df %>% select(where(is.numeric))))
+                                               )),
+                                             box(title = "Grouped kernel density plot",
+                                                 width = 12,
+                                                 plotlyOutput("bx1")
+                                             ),
+                                             box(title = "Box and whiskers plot",
+                                                 width = 12,
+                                                 plotlyOutput("bx2")
+                                             ),
+                                             box(title = "XYZ plot",
+                                                 width = 12,
+                                                 plotlyOutput("bx3")
+                                             )
+                                           ))
                                 ))),
                         tabItem(tabName = "multiVar",
                                 fluidRow(box(width = 3,
@@ -230,8 +282,8 @@ server <- function(input, output) {
   }) 
   
   output$bwp <- renderPlotly({
-    df1 <- df %>% select(c("ID",input$contVar)) %>% 
-      drop_na() %>% rename("xvar"=input$contVar)
+    df1 <- df %>% select(c("ID",input$contVar)) %>%
+      rename("xvar"=input$contVar)
       ggplotly(
         ggplot(data = df1,aes(x = 1,y = xvar)) +
           geom_boxplot(colour = "black",lwd=1.5,fill = "cyan") + 
@@ -239,10 +291,10 @@ server <- function(input, output) {
           ylab(input$contVar) +
           coord_flip() +
           theme_classic() + 
-          theme(axis.line = element_line(colour = 'black', size = 2),
+          theme(axis.line = element_line(colour = 'black', size = 1),
                 axis.ticks.y = element_blank(),
-                axis.ticks.x = element_line(colour = "black", size = 2),
-                axis.text.x = element_text(color = "black", size = 20),
+                axis.ticks.x = element_line(colour = "black", size = 1),
+                axis.text.x = element_text(color = "black", size = 15),
                 axis.text.y = element_blank(),
                 axis.title.x = element_text(color = "black", size = 0),
                 axis.title.y = element_blank(),
@@ -287,12 +339,74 @@ server <- function(input, output) {
     df1[,c("xvar","yvar")] <- sapply(df1[,c("xvar","yvar")],as.numeric)
     ggplotly(
       ggplot(df1, aes(x=xvar,y=yvar)) +
-        geom_jitter(aes(text=ID,color = zvar),width = 0.5) +
+        geom_jitter(aes(text=ID,color = zvar),width = 0.2) +
         geom_smooth(aes(color = zvar)) +
         labs(x = input$x, y = input$y, color = input$z) +
-        theme_classic(), height = 430
+        theme_classic() +
+        scale_fill_brewer(palette = "Set3") +
+        scale_color_brewer(palette = "Set3"), height = 430
     )
   })
+  output$br1 <- renderPlotly({
+    df1 <- df %>% select(c(input$x1,input$y1)) %>% 
+      rename("xvar"=input$x1,"yvar"=input$y1)
+    ggplotly(
+      ggplot(df1, aes(x=xvar,fill=yvar)) +
+        geom_bar(position = "stack",color = "black", lwd = 0.5) +
+        labs(x = input$x1, y = "ratio") +
+        scale_fill_brewer(palette = "Set3") +
+        theme_classic()
+    )
+  })
+  output$br2 <- renderPlotly({
+    df1 <- df %>% select(c(input$x1,input$y1)) %>% 
+      rename("xvar"=input$x1,"yvar"=input$y1)
+    ggplotly(
+      ggplot(df1, aes(x=xvar,fill=yvar)) +
+        geom_bar(position = "dodge",color = "black", lwd = 0.5) +
+        labs(x = input$x1) +
+        scale_fill_brewer(palette = "Set3") +
+        theme_classic()
+    )
+  })
+  output$br3 <- renderPlotly({
+    df1 <- df %>% select(c(input$x1,input$y1)) %>% 
+      rename("xvar"=input$x1,"yvar"=input$y1)
+    ggplotly(
+      ggplot(df1, aes(x=xvar,fill=yvar)) +
+        geom_bar(position = "fill",color = "black", lwd = 0.5) +
+        labs(x = input$x1, y = "ratio") +
+        scale_fill_brewer(palette = "Set3") +
+        theme_classic()
+    )
+  })
+  output$bx1 <- renderPlotly({
+    df1 <- df %>% select(c(input$x2,input$y2)) %>% 
+      rename("xvar"=input$x2,"yvar"=input$y2)
+    ggplotly(
+      ggplot(df1, aes(x=yvar,fill=xvar)) +
+        geom_density(alpha = 0.4) +
+        labs(x = input$y2) +
+        scale_fill_brewer(palette = "Set3") +
+        theme_classic()
+    )
+  })
+  output$bx2 <- renderPlotly({
+    df1 <- df %>% select(c("ID",input$x2,input$y2)) %>% 
+      rename("xvar"=input$x2,"yvar"=input$y2)
+    ggplotly(
+      ggplot(data = df1,aes(x = xvar,y = yvar)) +
+        geom_boxplot(colour = "black",lwd=1) + 
+        geom_jitter(aes(text = ID),width = 0.2, alpha = 0.4) +
+        labs(x = input$x2, y = input$y2) +
+        theme_classic() + 
+        theme(axis.line = element_line(colour = 'black', size = 1),
+              axis.ticks = element_line(colour = "black", size = 1),
+              axis.text = element_text(color = "black", size = 15),
+              axis.title = element_text(color = "black", size = 20),
+              legend.position = "right")
+    )
+    })
 }
 
 # Run the app ----
