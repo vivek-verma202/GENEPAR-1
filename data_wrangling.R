@@ -177,3 +177,14 @@ df <- within(df, {
 })
 
 saveRDS(df,"C:/Users/Vivek/Desktop/GENEPAR-1/genepar/GENEPAR1.RDS")
+
+
+
+
+
+
+
+
+
+
+
