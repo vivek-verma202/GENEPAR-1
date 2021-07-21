@@ -1,0 +1,317 @@
+---
+title: "**Genepar: Pain Intensity & Medication Use**"
+author: "Vivek Verma"
+date: "`r lubridate::today()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("haven")
+library("tidyverse")
+library("plotly")
+library("kableExtra")
+library("gtsummary")
+library("jtools")
+library("lme4")
+library("effects")
+options(knitr.kable.NA = '')
+```
+
+## **Pain and Covariate data**
+
+#### Pain data were collected at the **baseline** (M00), at **6-month** follow-up (M06) and at **12-month** follow-up (M12).
+
+#### **Age** and **sex** were chosen as the covariates.
+
+```{r include=T, warning=F,message=F}
+df <- read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/requete.sas7bdat",
+               "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
+df <- df %>% dplyr::select(c(ID, PQ00_AGE, PQ00_SEX,
+                      PQ00_BPI_GLOBAL_SCORE,
+                      PQ06_BPI_GLOBAL_SCORE,
+                      PQ12_BPI_GLOBAL_SCORE))
+df$PQ00_SEX <- as.factor(ifelse(df$PQ00_SEX==1,"Women","Men"))
+colnames(df) <- c("ID","AGE","SEX","M00_PAIN","M06_PAIN","M12_PAIN")
+df <- zap_label(df)
+summary(df[,-1]) %>%
+  kbl(caption = "Data Summary") %>%
+  kable_classic("hover", full_width = T, html_font = "Cambria")
+```
+
+```{r fig.align='center', message=FALSE, warning=FALSE, include=T}
+df0 <- df
+colnames(df0) <- c("ID","AGE","SEX","M00","M06","M12")
+df0 <- df0 %>% pivot_longer(-c(1:3),names_to = "TIME",values_to = "PAIN")
+df0$TIME <- factor(df0$TIME, ordered = T)
+  plot_ly(df0, x = ~TIME, 
+          y = ~PAIN, 
+          color = ~SEX,
+          colors = c("#535DE6", "#FC52FF"),
+          type = "box",
+          marker = list( size = 5),
+          boxpoints = "all",
+          jitter = 0.4,
+          pointpos = 0
+  ) %>% layout(boxmode = "group")
+```
+
+## **Pain Medication data**
+
+#### Note that the drug classes: **NSAIDS** and **OPIOIDS** were implicitly enriched. E.g.: ACETAMINOPHEN AND CODEINE is counted as **OPIOIDS** (not as ACETAMINOPHEN)
+
+#### Also, **NSAIDS** were preferably enriched over OPIOIDS. E.g.: IBUPROFEN AND CODEINE is counted as **NSAIDS** (not as OPIOIDS)
+
+### Pain medications at **baseline (M00)**:
+
+```{r include=T, warning=F,message=F}
+df1 <- read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/in00_pmed_actuell_boni.sas7bdat",
+                "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
+df1 <- df1 %>% dplyr::select(c(ID,NQ00_CPM_ACT))
+df1 <- unique(df1)
+df1$MED <- NA
+df1$MED[grep("ACETAMINOPH",df1$NQ00_CPM_ACT)] <- "ACETAMINOPHEN"
+df1$MED[grep("GABA",df1$NQ00_CPM_ACT)] <- "GABA_ANALOGS"
+df1$MED[grep(pattern = "MORPH|CODONE|CODEINE|CODÉINE|METHADONE|TRAMADOL|FENTANYL|TAPENTADOL",
+             df1$NQ00_CPM_ACT)] <- "OPIOIDS"
+df1$MED[grep(pattern = "PROFEN|NAPROX|KETORO|COXIB|FENAC",
+             df1$NQ00_CPM_ACT)] <- "NSAIDS"
+df1$MED[is.na(df1$MED)] <- "OTHER"
+table(df1$NQ00_CPM_ACT,df1$MED) %>%
+  kbl(caption = "Baseline pain medication classification") %>%
+  kable_classic("hover", full_width = T, html_font = "Cambria")
+df1 <- df1[,c(1,3)]
+df1 <- unique(df1)
+df1$TIME <- "M00"
+```
+
+### Pain medications at **follow-up (M06 and M12)**:
+
+```{r include=T, warning=F,message=F}
+df2 <- read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/in06_pmed_actuell_boni.sas7bdat",
+                "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
+df2 <- df2 %>% dplyr::select(c(ID,NQ06_CPM_ACT))
+df2 <- unique(df2)
+df2$MED <- NA
+df2$MED[grep("ACETAMINOPH",df2$NQ06_CPM_ACT)] <- "ACETAMINOPHEN"
+df2$MED[grep("GABA",df2$NQ06_CPM_ACT)] <- "GABA_ANALOGS"
+df2$MED[grep(pattern = "MORPH|CODONE|CODEINE|CODÉINE|METHADONE|TRAMADOL|FENTANYL|TAPENTADOL",
+             df2$NQ06_CPM_ACT)] <- "OPIOIDS"
+df2$MED[grep(pattern = "PROFEN|NAPROX|KETORO|COXIB|FENAC",
+             df2$NQ06_CPM_ACT)] <- "NSAIDS"
+df2$MED[is.na(df2$MED)] <- "OTHER"
+
+df3 <- read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/in12_pmed_actuell_boni.sas7bdat",
+                "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
+df3 <- df3 %>% dplyr::select(c(ID,NQ12_CPM_ACT))
+df3 <- unique(df3)
+df3$MED <- NA
+df3$MED[grep("ACETAMINOPH",df3$NQ12_CPM_ACT)] <- "ACETAMINOPHEN"
+df3$MED[grep("GABA",df3$NQ12_CPM_ACT)] <- "GABA_ANALOGS"
+df3$MED[grep(pattern = "MORPH|CODONE|CODEINE|CODÉINE|METHADONE|TRAMADOL|FENTANYL|TAPENTADOL",
+             df3$NQ12_CPM_ACT)] <- "OPIOIDS"
+df3$MED[grep(pattern = "PROFEN|NAPROX|KETORO|COXIB|FENAC",
+             df3$NQ12_CPM_ACT)] <- "NSAIDS"
+df3$MED[is.na(df3$MED)] <- "OTHER"
+df2 <- df2[,c(1,3)]
+df2 <- unique(df2)
+df2$TIME <- "M06"
+df3 <- df3[,c(1,3)]
+df3 <- unique(df3)
+df3$TIME <- "M12"
+df4 <- dplyr::bind_rows(list(df1,df2,df3))
+ggplotly(
+  ggplot(df4, aes(fill=factor(MED), x=factor(TIME))) + 
+    geom_bar(position="dodge") +
+    labs(x = "VISITS", y = "COUNTS", title = "PAIN MEDICATIONS AT 3 VISITS") +
+    theme_classic() + 
+    scale_fill_viridis_d() +
+    theme(axis.line = element_line(colour = 'black', size = 1),
+          axis.ticks = element_line(colour = "black", size = 1),
+          axis.text = element_text(color = "black", size = 15),
+          axis.title = element_text(color = "black", size = 15),
+          legend.title = element_blank(),
+          legend.text = element_text(color = "black", size = 10))
+)
+```
+
+## **Dependent Variable**
+
+#### <u>Global scores (Brief Pain Inventory, BPI)</u> were collected at all the three visits.
+
+#### However, 12-month follow-up data was missing for **82.83%** IDs
+
+```{r include=T, warning=F,message=F, figures-side1, fig.show="hold", out.width="50%"}
+naniar::vis_miss(df)
+naniar::gg_miss_upset(df)
+```
+
+#### Hence:
+
+#### 1. Follow-up pain scores were [combined]{.ul} and
+
+#### 2. [Change in pain scores]{.ul} (from baseline) were calculated and used as the **dependent variable**.
+
+#### Follow-up pain scores were combined using the following rules:
+
+#### 1. If follow-up scores were available for both the visits (n=165), **mean** was used.
+
+#### 2. If M06 was missing but M12 was present (n=12), M12 was used.
+
+#### 3. Data with no follow-up data (i.e. both M06 and M12 missing, n=243) were dropped.
+
+```{r fig.align='center', message=FALSE, warning=FALSE, include=T}
+df$comb_pain <- as.numeric(ifelse(is.na(df$M06_PAIN),df$M12_PAIN,
+                                  df$M06_PAIN))
+df$comb_pain[!is.na(df$M06_PAIN)&!is.na(df$M12_PAIN)] <- rowMeans(
+  df[(!is.na(df$M06_PAIN)&!is.na(df$M12_PAIN)),c(5,6)])
+df$PAIN_CHANGE <- df$comb_pain - df$M00_PAIN
+bw <- 3*IQR(df$PAIN_CHANGE, na.rm = T)/length(!is.na(df$PAIN_CHANGE))^(1/3)
+# Plots
+ggplotly(ggplot(df, aes(x = PAIN_CHANGE)) + 
+             geom_histogram(aes_string(fill = "..count..",
+                                       color = "..count.."),
+                            binwidth = bw) +
+             scale_fill_gradient(low="blue",high="pink") +
+             scale_color_gradient(low="blue",high="pink") +
+             xlab("Change in pain score") + theme_bw() +
+             theme(legend.position = "none")+facet_wrap(~SEX))
+# compress polydrugs at baseline using the logic described earlier 
+# (i.e. prefer NSAIDS > OPIOIDS > any other drug class)
+
+df1 <- df1[,-3]
+df1 <- reshape2::dcast(df1, ID ~ MED, length) # note: only 815 unique IDs
+df1$MED <- as.factor(
+  ifelse(df1$NSAIDS == 1, "NSAIDS",
+    ifelse(df1$OPIOIDS == 1,"OPIOIDs",
+      ifelse(df1$GABA_ANALOGS == 1, "GABA_ANALOGS",
+        ifelse(df1$ACETAMINOPHEN == 1, "ACETAMINOPHEN",
+          "OTHER"
+        )
+      )
+    )
+  )
+)
+# QC:
+# sum(df1$NSAIDS)
+# table(df1$MED)
+# merge with pain data:
+df1 <- merge(df,df1,by="ID",all=T)
+df1[,c(9:13)] <- lapply(df1[,c(9:13)], factor) 
+# plot
+  plot_ly(df1, y = ~MED, 
+          x = ~PAIN_CHANGE, 
+          color = ~SEX,
+          colors = c("#535DE6", "#FC52FF"),
+          type = "box",
+          marker = list( size = 5),
+          boxpoints = "all",
+          jitter = 0.4,
+          pointpos = 0
+  ) %>% layout(boxmode = "group", yaxis = list(title=""))
+table(df1$MED)
+```
+
+## Statistical modeling
+
+#### Following generalized linear modeling approaches were considered:
+
+### 1a. Fixed effect model:
+
+##### Dependent variable: change in pain scores
+
+##### Independent variable: drug class at baseline
+
+##### Covariates: age and sex
+
+```{r include=T, warning=F,message=F}
+# models
+m1ac <- glm(PAIN_CHANGE ~ AGE + SEX + ACETAMINOPHEN, family = "gaussian",
+            data = df1)
+m1gb <- glm(PAIN_CHANGE ~ AGE + SEX + GABA_ANALOGS, family = "gaussian", 
+            data = df1)
+m1op <- glm(PAIN_CHANGE ~ AGE + SEX + OPIOIDS, family = "gaussian",
+            data = df1)
+m1ns <- glm(PAIN_CHANGE ~ AGE + SEX + NSAIDS, family = "gaussian", 
+            data = df1)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+```
+
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+### 1b. Fixed effect model:
+
+##### Dependent variable: follow-up pain scores
+
+##### Independent variable: drug class at baseline
+
+##### Covariates: age, sex and baseline pain scores
+
+```{r include=T, warning=F,message=F}
+# models
+m1bac <- glm(comb_pain ~ AGE + SEX + M00_PAIN + ACETAMINOPHEN, family = "gaussian",
+            data = df1)
+m1bgb <- glm(comb_pain ~ AGE + SEX + M00_PAIN + GABA_ANALOGS, family = "gaussian", 
+            data = df1)
+m1bop <- glm(comb_pain ~ AGE + SEX + M00_PAIN + OPIOIDS, family = "gaussian",
+            data = df1)
+m1bns <- glm(comb_pain ~ AGE + SEX + M00_PAIN + NSAIDS, family = "gaussian", 
+            data = df1)
+export_summs(m1bac, m1bgb, m1bop, m1bns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+```
+
+```{r include=T, warning=F,message=F}
+plot_summs(m1bac, m1bgb, m1bop, m1bns, scale = TRUE, plot.distributions = TRUE)
+```
+
+### 2. Mixed effect model:
+
+##### Dependent variable: pain scores
+
+##### Fixed effects: drug class at baseline, age and sex
+
+##### Interaction: drug class at baseline \* time
+
+##### Random effects: ID
+
+```{r include=T, warning=F,message=F}
+# data prep
+names(df1)[4] <- "M00"
+names(df1)[5] <- "M06"
+names(df1)[6] <- "M12"
+dfl <- df1 %>% pivot_longer(cols = c("M00","M06","M12"),
+                            names_to = "TIME",
+                            values_to = "PAIN")
+dfl$TIME[dfl$TIME == "M00"] <- 0
+dfl$TIME[dfl$TIME == "M06"] <- 6
+dfl$TIME[dfl$TIME == "M12"] <- 12
+dfl$TIME <- as.factor(dfl$TIME)
+m2ac <- lmer(PAIN ~ 1 + AGE + SEX + TIME * ACETAMINOPHEN + (1 | ID), data = dfl)
+m2gb <- lmer(PAIN ~ 1 + AGE + SEX + TIME * GABA_ANALOGS + (1 | ID), data = dfl)
+m2op <- lmer(PAIN ~ 1 + AGE + SEX + TIME * OPIOIDS + (1 | ID), data = dfl)
+m2ns <- lmer(PAIN ~ 1 + AGE + SEX + TIME * NSAIDS + (1 | ID), data = dfl)
+export_summs(m2ac, m2gb, m2op, m2ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+
+```
+
+```{r include=T, warning=F,message=F}
+plot_summs(m2ac, m2gb, m2op, m2ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+#### Interaction plots
+
+```{r include=T, warning=F,message=F}
+ plot(Effect(c("TIME","ACETAMINOPHEN"),m2ac))
+ plot(Effect(c("TIME","GABA_ANALOGS"),m2gb))
+ plot(Effect(c("TIME","OPIOIDS"),m2op))
+ plot(Effect(c("TIME","NSAIDS"),m2ns))
+```
+
+```{r include=T, warning=F,message=F}
+sessionInfo()
+```
