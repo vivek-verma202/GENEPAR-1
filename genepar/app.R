@@ -1,7 +1,7 @@
 library(shiny)
 library(shinydashboard)
 library(DT)
-library(summarytools)
+library(gtsummary)
 library(plotly)
 library(RColorBrewer)
 library(cowplot)
@@ -78,7 +78,9 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                                 }
                                                 </style>"),
                                            HTML("<i>"),
-                                           h3(strong("GENEPAR-1 participants are  a subset of Quebec Pain Registry (QPR) patients with lower back pain.")),
+                                           h3(strong("GENEPAR-1 participants are  a subset of
+                                                     Quebec Pain Registry (QPR) patients with
+                                                     either lower back pain or neuropathic pain.")),
                                            HTML("</i>"),
                                            HTML("<div style='height: 5px;'>"),
                                            HTML("</div>"),
@@ -86,8 +88,6 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                            dataTableOutput('tbl'),
                                            HTML("<div style='height: 15px;'>"),
                                            HTML("</div>"),
-                                           h2(strong("GENEPAR-1 dataset: Summary of all variables")),
-                                           htmlOutput("tbl1"),
                                            HTML("<div style='display: block;padding-bottom:50px'>"),
                                            HTML("</div>"))))),
                         tabItem(tabName = "uniCon",
@@ -263,13 +263,10 @@ tags$footer(HTML("<div class='footer'>",
 # Define server logic ----
 server <- function(input, output) {
   
-  output$tbl <- renderDataTable(read.delim("DICTIONARY.txt"))
-  
-  output$tbl1  <- renderUI({
-    SumProfile <- print(dfSummary(readRDS("GENEPAR1.RDS")[,-c(1)]),
-                        omit.headings = T, method = 'render',
-                        bootstrap.css = F)
-    SumProfile})
+  output$tbl <- renderDataTable({
+    dict <- readxl::read_excel("/home/vverma3/repo/GENEPAR-1/DICTIONARY.xlsx")
+    dict
+  })
   
   output$hist  <- renderPlotly({
     df1 <- df %>% select(input$contVar) %>% 

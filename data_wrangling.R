@@ -215,14 +215,14 @@ df1$MED[grep(pattern = "PROFEN|NAPROX|KETORO|COXIB|FENAC",
              df1$NQ00_CPM_ACT)] <- "NSAIDS"
 df1$MED[is.na(df1$MED)] <- "OTHER"
 df <- merge(df,df1,by="ID",all.x=T)
-table(df$MED)
+df$MED <- as.factor(df$MED)
 naniar::vis_miss(df)
 naniar::gg_miss_var(df)
 # naniar::gg_miss_upset(df)
 # final cleaning
 df <- df[,c(1:8,76,75,79,77,11,9,10,12:74)]
 names(df)[c(12,13)] <- c("PAIN_BASELINE","PAIN_FOLLOW_UP")
-
+df <- haven::zap_labels(haven::zap_label(df))
 ####################################
 saveRDS(df,"./genepar/GENEPAR1.RDS")
 ####################################
