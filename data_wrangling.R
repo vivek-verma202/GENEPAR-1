@@ -1,3 +1,5 @@
+library(tidyverse)
+library(haven)
 df <- readxl::read_excel("data.xlsx")
 df <- within(df, {
   DIAGNOSIS <- as.factor(DIAGNOSIS)
@@ -185,17 +187,22 @@ df <- within(df, {
                                   "Quite a bit","Extremely"),ordered = T)
 })
 
-# fix outliers:
+# height data has a lot of extreme values:
+boxplot(df$HEIGHT)
+# fix height outliers:
 df$HEIGHT <- DescTools::Winsorize(df$HEIGHT)
 # calculate BMI:
 df$BMI <- df$WEIGHT/(df$HEIGHT/100)^2
 # get baseline pain and covariate data
-df1 <- haven::read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/requete.sas7bdat",
+df1 <- read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/requete.sas7bdat",
                "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
-df1 <- df1 %>% dplyr::select(c(ID, PQ00_AGE, PQ00_SEX,PQ00_YOUR_PAIN_Q2))
-df1$PQ00_SEX <- as.factor(ifelse(df1$PQ00_SEX==1,"Women","Men"))
-colnames(df1) <- c("ID","AGE","SEX_1","BASELINE")
-df1 <- haven::zap_label(df1)
+df1 <- df1 %>% select(c(ID, PQ00_AGE, PQ00_SEX,PQ00_YOUR_PAIN_Q2)) %>% 
+  mutate_all(as.character) %>% mutate_all(zap_empty)
+colnames(df1) <- c("ID","AGE","SEX_1","PAIN_BASELINE")
+df1$AGE <- as.numeric(df1$AGE)
+df1$SEX_1 <- as.factor(ifelse(df1$SEX_1==1,"Women","Men")) # coding checked
+df1$PAIN_BASELINE <- as.numeric(df1$PAIN_BASELINE)
+df1 <- zap_label(df1)
 df <- merge(df,df1,by="ID",all.x=T)
 # QC:
 table(df$SEX,df$SEX_1)
@@ -204,51 +211,49 @@ plot(df$DOB,df$AGE)
 # baseline medication data:
 df1 <- haven::read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/in00_pmed_actuell_boni.sas7bdat",
                 "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
-df1 <- df1 %>% dplyr::select(c(ID,NQ00_CPM_ACT))
+# select the columns with ID and active drug:
+df1 <- df1 %>% select(c(ID,NQ00_CPM_ACT)) %>%
+  mutate_all(as.character) %>% mutate_all(zap_empty) %>% filter(complete.cases(.))
+length(df1$ID) # 2243
+length(unique(df1$ID)) # 812
+# remove redundant rows:
 df1 <- unique(df1)
-df1$MED <- NA
-df1$MED[grep("ACETAMINOPH",df1$NQ00_CPM_ACT)] <- "ACETAMINOPHEN"
-df1$MED[grep("GABA",df1$NQ00_CPM_ACT)] <- "GABA_ANALOGS"
-df1$MED[grep(pattern = "MORPH|CODONE|CODEINE|CODÉINE|METHADONE|TRAMADOL|FENTANYL|TAPENTADOL",
-             df1$NQ00_CPM_ACT)] <- "OPIOIDS"
-df1$MED[grep(pattern = "PROFEN|NAPROX|KETORO|COXIB|FENAC",
-             df1$NQ00_CPM_ACT)] <- "NSAIDS"
-df1$MED[is.na(df1$MED)] <- "OTHER"
+length(df1$ID) # 2036
+# create medication classes:
+df1$ACETAMINOPHEN <- NA
+df1$GABA_ANALOGS <- NA
+df1$OPIOIDS <- NA
+df1$NSAIDS <- NA
+df1$OTHER <- NA
+df1$ACETAMINOPHEN <- ifelse(grepl("ACETAMINOPH", df1$NQ00_CPM_ACT),1,0)
+df1$GABA_ANALOGS <- ifelse(grepl("GABA", df1$NQ00_CPM_ACT),1,0)
+df1$OPIOIDS <- ifelse(grepl("MORPH|CODONE|CODEINE|CODÉINE|METHADONE|
+                                      TRAMADOL|FENTANYL|TAPENTADOL",
+                                      df1$NQ00_CPM_ACT),1,0)
+df1$NSAIDS <- ifelse(grepl("PROFEN|NAPROX|KETORO|COXIB|FENAC",
+                                  df1$NQ00_CPM_ACT),1,0)
+# there were no missing drug data, if a drug was not assigned a class, count it as "OTHER":
+df1$OTHER <- ifelse(
+  df1$ACETAMINOPHEN+df1$GABA_ANALOGS+df1$OPIOIDS+df1$NSAIDS == 0, 1, 0)
+df1$NQ00_CPM_ACT <- NULL
+df1 <- unique(df1) # from 2036 to 1801
+# but IDs are still not unique
+df1[df1 == 0] <- NA 
+df1 <- df1 %>% group_by(ID) %>% summarise_all(list(~ .[!is.na(.)][1]))
+df1[is.na(df1)] <- 0
+df1 <- df1 %>% mutate_if(is.numeric,as.factor)
+length(df1$ID) == length(unique(df1$ID)) # TRUE :)
+length(df$ID) == length(unique(df$ID)) # TRUE :)
 df <- merge(df,df1,by="ID",all.x=T)
-df$MED <- as.factor(df$MED)
+# visualize missing data
 naniar::vis_miss(df)
 naniar::gg_miss_var(df)
 # naniar::gg_miss_upset(df)
 # final cleaning
-df <- df[,c(1:8,76,75,79,77,11,9,10,12:74)]
-names(df)[c(12,13)] <- c("PAIN_BASELINE","PAIN_FOLLOW_UP")
-df <- haven::zap_labels(haven::zap_label(df))
+df <- df[,c(1:8,76,75,77,11,9,10,12:74,78:82)]
+names(df)[12] <- "PAIN_FOLLOW_UP"
+# make sure all is well:
+glimpse(df)
 ####################################
 saveRDS(df,"./genepar/GENEPAR1.RDS")
 ####################################
-df1 <- df
-names(df1)[c(12,13)] <- c("BASELINE","FOLLOW_UP")
-# data in long form:
-dfl <- tidyr::gather(df1, TIME, PAIN_NRS, 
-                     BASELINE:FOLLOW_UP, factor_key = T)
-naniar::gg_miss_var(dfl)
-
-####################################
-saveRDS(dfl,"./GENEPAR1_long.RDS")
-####################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -11,52 +11,79 @@ library("haven")
 library("tidyverse")
 library("plotly")
 library("kableExtra")
-library("gtsummary")
 library("jtools")
 library("lme4")
 library("effects")
+library("data.table")
 options(knitr.kable.NA = '')
+theme_set(
+  theme_classic() +
+    theme(legend.position = "top")
+  )
 ```
 
-## **Pain and Covariate data**
-
-#### Pain data were collected at the **baseline** (M00), at **6-month** follow-up (M06) and at **12-month** follow-up (M12).
-
-#### **Age** and **sex** were chosen as the covariates.
+## **Data Summary**
 
 ```{r include=T, warning=F,message=F}
-df <- read_sas("/mnt/nfs/backup/data/quebec_pain_registry/outdir/requete.sas7bdat",
-               "/mnt/nfs/backup/data/quebec_pain_registry/outdir/formats.sas7bcat")
-df <- df %>% dplyr::select(c(ID, PQ00_AGE, PQ00_SEX,
-                      PQ00_BPI_GLOBAL_SCORE,
-                      PQ06_BPI_GLOBAL_SCORE,
-                      PQ12_BPI_GLOBAL_SCORE))
-df$PQ00_SEX <- as.factor(ifelse(df$PQ00_SEX==1,"Women","Men"))
-colnames(df) <- c("ID","AGE","SEX","M00_PAIN","M06_PAIN","M12_PAIN")
-df <- zap_label(df)
+df <- readRDS("./genepar/GENEPAR1.RDS")
 summary(df[,-1]) %>%
-  kbl(caption = "Data Summary") %>%
-  kable_classic("hover", full_width = T, html_font = "Cambria")
+  kbl(caption = "Summary of all variables") %>%
+  kable_classic("hover", html_font = "Cambria", full_width = F) %>% scroll_box(width = "100%")
 ```
+
+### Pain (NRS)
+
+#### Pain scores were collected at the baseline and follow-up visits
+
+#### using the following question:
+
+#### \*\* *In the past 7 days, how would you rate your lower back pain on average? (0-10 scale)* \*\*
 
 ```{r fig.align='center', message=FALSE, warning=FALSE, include=T}
-df0 <- df
-colnames(df0) <- c("ID","AGE","SEX","M00","M06","M12")
-df0 <- df0 %>% pivot_longer(-c(1:3),names_to = "TIME",values_to = "PAIN")
-df0$TIME <- factor(df0$TIME, ordered = T)
-  plot_ly(df0, x = ~TIME, 
-          y = ~PAIN, 
-          color = ~SEX,
-          colors = c("#535DE6", "#FC52FF"),
-          type = "box",
-          marker = list( size = 5),
-          boxpoints = "all",
-          jitter = 0.4,
-          pointpos = 0
-  ) %>% layout(boxmode = "group")
+dfl <- readRDS("./GENEPAR1_long.RDS")
+df.summary <- dfl %>%
+  group_by(DIAGNOSIS,TIME,SEX) %>%
+  dplyr::summarise(
+    Pain = mean(PAIN_NRS, na.rm = T),
+    n = n(),
+    sd = sd(PAIN_NRS, na.rm = T),
+    se = sd/sqrt(n))
+df.summary  %>%
+  kbl(caption = "Summary of Pain") %>%
+  kable_classic("hover", html_font = "Cambria", full_width = T)
+# plot
+pd <- position_dodge(0.2)
+  ggplot(df.summary, aes(x=TIME, y=Pain, colour=SEX, group=SEX)) + 
+    geom_errorbar(aes(ymin=Pain-sd, ymax=Pain+sd, colour=SEX),
+                  width=0.2, position=pd, lwd = 2) +
+    geom_line(aes(colour=SEX),position=pd, lwd = 2) +
+    geom_point(aes(fill=SEX),position=pd, size=4, shape=21) +
+  scale_fill_manual(values = c("#F062F1","#3A27D4"))  +
+  scale_color_manual(values = c("#F062F1","#3A27D4")) +
+    labs(title = "Change in pain scores",
+         x = "Time",
+         y = "Pain (NRS)",
+         caption = "Errorbars represent SD") +
+    ylim(-0.2,10.2) +
+    facet_wrap(~DIAGNOSIS)
+
 ```
 
-## **Pain Medication data**
+### Distribution of the change in pain
+
+```{r fig.align='center', message=FALSE, warning=FALSE, include=T}
+df$PAIN_CHANGE <- df$PAIN_FOLLOW_UP - df$PAIN_BASELINE
+ggplotly(ggplot(df, aes(x = PAIN_CHANGE)) + 
+             geom_histogram(aes_string(fill = "..count..",
+                                       color = "..count.."),
+                            binwidth = 1) +
+             scale_fill_gradient(low="gray",high="red") +
+             scale_color_gradient(low="gray",high="red") +
+             xlab("Change in pain score") + theme_bw() +
+             theme(legend.position = "none")+facet_wrap(~SEX))
+```
+
+### **Pain Medication data**
 
 #### Note that the drug classes: **NSAIDS** and **OPIOIDS** were implicitly enriched. E.g.: ACETAMINOPHEN AND CODEINE is counted as **OPIOIDS** (not as ACETAMINOPHEN)
 
@@ -79,7 +106,8 @@ df1$MED[grep(pattern = "PROFEN|NAPROX|KETORO|COXIB|FENAC",
 df1$MED[is.na(df1$MED)] <- "OTHER"
 table(df1$NQ00_CPM_ACT,df1$MED) %>%
   kbl(caption = "Baseline pain medication classification") %>%
-  kable_classic("hover", full_width = T, html_font = "Cambria")
+  kable_classic("hover", full_width = T, html_font = "Cambria") %>% 
+  scroll_box(width = "100%", height = "500px")
 df1 <- df1[,c(1,3)]
 df1 <- unique(df1)
 df1$TIME <- "M00"
@@ -123,7 +151,7 @@ df4 <- dplyr::bind_rows(list(df1,df2,df3))
 ggplotly(
   ggplot(df4, aes(fill=factor(MED), x=factor(TIME))) + 
     geom_bar(position="dodge") +
-    labs(x = "VISITS", y = "COUNTS", title = "PAIN MEDICATIONS AT 3 VISITS") +
+    labs(x = "Time", y = "Counts", title = "Pain medications intake") +
     theme_classic() + 
     scale_fill_viridis_d() +
     theme(axis.line = element_line(colour = 'black', size = 1),
@@ -135,181 +163,312 @@ ggplotly(
 )
 ```
 
-## **Dependent Variable**
-
-#### <u>Global scores (Brief Pain Inventory, BPI)</u> were collected at all the three visits.
-
-#### However, 12-month follow-up data was missing for **82.83%** IDs
-
-```{r include=T, warning=F,message=F, figures-side1, fig.show="hold", out.width="50%"}
-naniar::vis_miss(df)
-naniar::gg_miss_upset(df)
-```
-
-#### Hence:
-
-#### 1. Follow-up pain scores were [combined]{.ul} and
-
-#### 2. [Change in pain scores]{.ul} (from baseline) were calculated and used as the **dependent variable**.
-
-#### Follow-up pain scores were combined using the following rules:
-
-#### 1. If follow-up scores were available for both the visits (n=165), **mean** was used.
-
-#### 2. If M06 was missing but M12 was present (n=12), M12 was used.
-
-#### 3. Data with no follow-up data (i.e. both M06 and M12 missing, n=243) were dropped.
-
-```{r fig.align='center', message=FALSE, warning=FALSE, include=T}
-df$comb_pain <- as.numeric(ifelse(is.na(df$M06_PAIN),df$M12_PAIN,
-                                  df$M06_PAIN))
-df$comb_pain[!is.na(df$M06_PAIN)&!is.na(df$M12_PAIN)] <- rowMeans(
-  df[(!is.na(df$M06_PAIN)&!is.na(df$M12_PAIN)),c(5,6)])
-df$PAIN_CHANGE <- df$comb_pain - df$M00_PAIN
-bw <- 3*IQR(df$PAIN_CHANGE, na.rm = T)/length(!is.na(df$PAIN_CHANGE))^(1/3)
-# Plots
-ggplotly(ggplot(df, aes(x = PAIN_CHANGE)) + 
-             geom_histogram(aes_string(fill = "..count..",
-                                       color = "..count.."),
-                            binwidth = bw) +
-             scale_fill_gradient(low="blue",high="pink") +
-             scale_color_gradient(low="blue",high="pink") +
-             xlab("Change in pain score") + theme_bw() +
-             theme(legend.position = "none")+facet_wrap(~SEX))
-# compress polydrugs at baseline using the logic described earlier 
-# (i.e. prefer NSAIDS > OPIOIDS > any other drug class)
-
-df1 <- df1[,-3]
-df1 <- reshape2::dcast(df1, ID ~ MED, length) # note: only 815 unique IDs
-df1$MED <- as.factor(
-  ifelse(df1$NSAIDS == 1, "NSAIDS",
-    ifelse(df1$OPIOIDS == 1,"OPIOIDs",
-      ifelse(df1$GABA_ANALOGS == 1, "GABA_ANALOGS",
-        ifelse(df1$ACETAMINOPHEN == 1, "ACETAMINOPHEN",
-          "OTHER"
-        )
-      )
-    )
-  )
-)
-# QC:
-# sum(df1$NSAIDS)
-# table(df1$MED)
-# merge with pain data:
-df1 <- merge(df,df1,by="ID",all=T)
-df1[,c(9:13)] <- lapply(df1[,c(9:13)], factor) 
-# plot
-  plot_ly(df1, y = ~MED, 
-          x = ~PAIN_CHANGE, 
-          color = ~SEX,
-          colors = c("#535DE6", "#FC52FF"),
-          type = "box",
-          marker = list( size = 5),
-          boxpoints = "all",
-          jitter = 0.4,
-          pointpos = 0
-  ) %>% layout(boxmode = "group", yaxis = list(title=""))
-table(df1$MED)
-```
-
 ## Statistical modeling
+
+### Data preparation
+
+```{r include=T, warning=F,message=F}
+df1 <- reshape2::dcast(df1, ID ~ MED, length) # note: only 815 unique IDs
+df1[-1] <- lapply(df1[-1], factor)
+df <- merge(df,df1,by = "ID", all.x = T)
+dfl <- merge(dfl,df1,by = "ID", all.x = T)
+```
 
 #### Following generalized linear modeling approaches were considered:
 
-### 1a. Fixed effect model:
+### 1. Fixed effect models:
 
-##### Dependent variable: change in pain scores
+#### A. Welch Two Sample t-test
 
-##### Independent variable: drug class at baseline
+```{r include=T, warning=F,message=F}
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Lower Back Pain") %>% 
+  dplyr::select(PAIN_CHANGE, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER) %>% 
+  pivot_longer(!PAIN_CHANGE, names_to = "Drug", values_to = "Group")
+dt$Group <- as.factor(ifelse(
+  dt$Group == 1, "treatment", "control"
+))
 
-##### Covariates: age and sex
+ttestbyDrug <- function(myDrug) {
+  bt <- filter(dt, Group=="treatment", Drug==myDrug)
+  bc <- filter(dt, Group=="control", Drug==myDrug)
+  
+  b <- t.test(bt$PAIN_CHANGE, bc$PAIN_CHANGE, conf.level=0.90)
+  
+  dataDrugPAIN_CHANGE <- data.frame(Drug = myDrug,
+                          treatment = round(b$estimate[[1]], digits = 3),
+                          control = round(b$estimate[[2]], digits = 3),
+                          CI = paste('(',round(b$conf.int[[1]], 
+                                               digits = 2),', ',
+                                     round(b$conf.int[[2]], 
+                                           digits = 2), ')',
+                                     sep=""),
+                          pvalue = round(b$p.value, digits = 3),
+                          ntreatment = nrow(bt),  # changes only in
+                          ncontrol = nrow(bc))    # these 2 nrow() args
+}
+T_Test <- dt$Drug %>% 
+  unique %>% 
+  lapply(., ttestbyDrug) %>% rbindlist
+T_Test$total_N <- T_Test$ntreatment + T_Test$ncontrol
+T_Test %>%
+  kbl(caption = "Effect of drug intake on change in LBP scores") %>%
+  kable_classic("hover", html_font = "Cambria", full_width = F) %>% scroll_box(width = "100%")
+```
+
+```{r include=T, warning=F,message=F}
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Neuropathic Pain") %>% 
+  dplyr::select(PAIN_CHANGE, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER) %>% 
+  pivot_longer(!PAIN_CHANGE, names_to = "Drug", values_to = "Group")
+dt$Group <- as.factor(ifelse(
+  dt$Group == 1, "treatment", "control"
+))
+
+ttestbyDrug <- function(myDrug) {
+  bt <- filter(dt, Group=="treatment", Drug==myDrug)
+  bc <- filter(dt, Group=="control", Drug==myDrug)
+  
+  b <- t.test(bt$PAIN_CHANGE, bc$PAIN_CHANGE, conf.level=0.90)
+  
+  dataDrugPAIN_CHANGE <- data.frame(Drug = myDrug,
+                          treatment = round(b$estimate[[1]], digits = 3),
+                          control = round(b$estimate[[2]], digits = 3),
+                          CI = paste('(',round(b$conf.int[[1]], 
+                                               digits = 2),', ',
+                                     round(b$conf.int[[2]], 
+                                           digits = 2), ')',
+                                     sep=""),
+                          pvalue = round(b$p.value, digits = 3),
+                          ntreatment = nrow(bt),  # changes only in
+                          ncontrol = nrow(bc))    # these 2 nrow() args
+}
+T_Test <- dt$Drug %>% 
+  unique %>% 
+  lapply(., ttestbyDrug) %>% rbindlist
+T_Test$total_N <- T_Test$ntreatment + T_Test$ncontrol
+T_Test %>%
+  kbl(caption = "Effect of drug intake on change in neuropathic pain scores") %>%
+  kable_classic("hover", html_font = "Cambria", full_width = F) %>% scroll_box(width = "100%")
+
+```
+
+#### B1. Linear regression (change in LBP \~ Drug + age + sex + BMI + clinic)
 
 ```{r include=T, warning=F,message=F}
 # models
-m1ac <- glm(PAIN_CHANGE ~ AGE + SEX + ACETAMINOPHEN, family = "gaussian",
-            data = df1)
-m1gb <- glm(PAIN_CHANGE ~ AGE + SEX + GABA_ANALOGS, family = "gaussian", 
-            data = df1)
-m1op <- glm(PAIN_CHANGE ~ AGE + SEX + OPIOIDS, family = "gaussian",
-            data = df1)
-m1ns <- glm(PAIN_CHANGE ~ AGE + SEX + NSAIDS, family = "gaussian", 
-            data = df1)
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Lower Back Pain") %>% 
+  dplyr::select(PAIN_CHANGE, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- glm(PAIN_CHANGE ~ AGE + SEX + BMI + CLINIC + ACETAMINOPHEN,
+            family = "gaussian",
+            data = dt)
+m1gb <- glm(PAIN_CHANGE ~ GABA_ANALOGS + AGE + SEX + BMI + CLINIC,
+            family = "gaussian", 
+            data = dt)
+m1op <- glm(PAIN_CHANGE ~ OPIOIDS + AGE + SEX + BMI + CLINIC,
+            family = "gaussian",
+            data = dt)
+m1ns <- glm(PAIN_CHANGE ~ NSAIDS + AGE + SEX + BMI + CLINIC,
+            family = "gaussian", 
+            data = dt)
 export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
              error_format = "[{conf.low}, {conf.high}]")
-```
 
+```
 ```{r include=T, warning=F,message=F}
 plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
 ```
 
-### 1b. Fixed effect model:
-
-##### Dependent variable: follow-up pain scores
-
-##### Independent variable: drug class at baseline
-
-##### Covariates: age, sex and baseline pain scores
+#### B2. Linear regression (change in Neuropathic Pain \~ Drug + age + sex + BMI + clinic)
 
 ```{r include=T, warning=F,message=F}
 # models
-m1bac <- glm(comb_pain ~ AGE + SEX + M00_PAIN + ACETAMINOPHEN, family = "gaussian",
-            data = df1)
-m1bgb <- glm(comb_pain ~ AGE + SEX + M00_PAIN + GABA_ANALOGS, family = "gaussian", 
-            data = df1)
-m1bop <- glm(comb_pain ~ AGE + SEX + M00_PAIN + OPIOIDS, family = "gaussian",
-            data = df1)
-m1bns <- glm(comb_pain ~ AGE + SEX + M00_PAIN + NSAIDS, family = "gaussian", 
-            data = df1)
-export_summs(m1bac, m1bgb, m1bop, m1bns, scale = TRUE,
-             error_format = "[{conf.low}, {conf.high}]")
-```
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Neuropathic Pain") %>% 
+  dplyr::select(PAIN_CHANGE, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
 
-```{r include=T, warning=F,message=F}
-plot_summs(m1bac, m1bgb, m1bop, m1bns, scale = TRUE, plot.distributions = TRUE)
-```
-
-### 2. Mixed effect model:
-
-##### Dependent variable: pain scores
-
-##### Fixed effects: drug class at baseline, age and sex
-
-##### Interaction: drug class at baseline \* time
-
-##### Random effects: ID
-
-```{r include=T, warning=F,message=F}
-# data prep
-names(df1)[4] <- "M00"
-names(df1)[5] <- "M06"
-names(df1)[6] <- "M12"
-dfl <- df1 %>% pivot_longer(cols = c("M00","M06","M12"),
-                            names_to = "TIME",
-                            values_to = "PAIN")
-dfl$TIME[dfl$TIME == "M00"] <- 0
-dfl$TIME[dfl$TIME == "M06"] <- 6
-dfl$TIME[dfl$TIME == "M12"] <- 12
-dfl$TIME <- as.factor(dfl$TIME)
-m2ac <- lmer(PAIN ~ 1 + AGE + SEX + TIME * ACETAMINOPHEN + (1 | ID), data = dfl)
-m2gb <- lmer(PAIN ~ 1 + AGE + SEX + TIME * GABA_ANALOGS + (1 | ID), data = dfl)
-m2op <- lmer(PAIN ~ 1 + AGE + SEX + TIME * OPIOIDS + (1 | ID), data = dfl)
-m2ns <- lmer(PAIN ~ 1 + AGE + SEX + TIME * NSAIDS + (1 | ID), data = dfl)
-export_summs(m2ac, m2gb, m2op, m2ns, scale = TRUE,
+m1ac <- glm(PAIN_CHANGE ~ AGE + SEX + BMI + CLINIC + ACETAMINOPHEN,
+            family = "gaussian",
+            data = dt)
+m1gb <- glm(PAIN_CHANGE ~ GABA_ANALOGS + AGE + SEX + BMI + CLINIC,
+            family = "gaussian", 
+            data = dt)
+m1op <- glm(PAIN_CHANGE ~ OPIOIDS + AGE + SEX + BMI + CLINIC,
+            family = "gaussian",
+            data = dt)
+m1ns <- glm(PAIN_CHANGE ~ NSAIDS + AGE + SEX + BMI + CLINIC,
+            family = "gaussian", 
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
              error_format = "[{conf.low}, {conf.high}]")
 
 ```
-
 ```{r include=T, warning=F,message=F}
-plot_summs(m2ac, m2gb, m2op, m2ns, scale = TRUE, plot.distributions = TRUE)
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
 ```
 
-#### Interaction plots
+#### C1. Linear regression (follow-up LBP \~ Drug + baseline LBP + age + sex + BMI + clinic)
 
 ```{r include=T, warning=F,message=F}
- plot(Effect(c("TIME","ACETAMINOPHEN"),m2ac))
- plot(Effect(c("TIME","GABA_ANALOGS"),m2gb))
- plot(Effect(c("TIME","OPIOIDS"),m2op))
- plot(Effect(c("TIME","NSAIDS"),m2ns))
+# models
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Lower Back Pain") %>% 
+  dplyr::select(PAIN_BASELINE, PAIN_FOLLOW_UP, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- glm(PAIN_FOLLOW_UP ~ AGE + SEX + BMI + CLINIC + PAIN_BASELINE + ACETAMINOPHEN,
+            family = "gaussian",
+            data = dt)
+m1gb <- glm(PAIN_FOLLOW_UP ~ GABA_ANALOGS + AGE + SEX + BMI + CLINIC + PAIN_BASELINE,
+            family = "gaussian", 
+            data = dt)
+m1op <- glm(PAIN_FOLLOW_UP ~ OPIOIDS + AGE + SEX + BMI + CLINIC + PAIN_BASELINE,
+            family = "gaussian",
+            data = dt)
+m1ns <- glm(PAIN_FOLLOW_UP ~ NSAIDS + AGE + SEX + BMI + CLINIC + PAIN_BASELINE,
+            family = "gaussian", 
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+
+```
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+#### C2. Linear regression (follow-up NP \~ Drug + baseline NP + age + sex + BMI + clinic)
+
+```{r include=T, warning=F,message=F}
+# models
+dt <- df %>% dplyr::filter(!is.na(PAIN_FOLLOW_UP)) %>% 
+  dplyr::filter(DIAGNOSIS == "Neuropathic Pain") %>% 
+  dplyr::select(PAIN_BASELINE, PAIN_FOLLOW_UP, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- glm(PAIN_FOLLOW_UP ~ AGE + SEX + BMI + CLINIC + PAIN_BASELINE + ACETAMINOPHEN,
+            family = "gaussian",
+            data = dt)
+m1gb <- glm(PAIN_FOLLOW_UP ~ GABA_ANALOGS + AGE + SEX + BMI + CLINIC + PAIN_BASELINE,
+            family = "gaussian", 
+            data = dt)
+m1op <- glm(PAIN_FOLLOW_UP ~ OPIOIDS + AGE + SEX + BMI + CLINIC + PAIN_BASELINE,
+            family = "gaussian",
+            data = dt)
+m1ns <- glm(PAIN_FOLLOW_UP ~ NSAIDS + AGE + SEX + BMI + CLINIC + PAIN_BASELINE,
+            family = "gaussian", 
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+```
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+### 2. Mixed effect models:
+#### A1. Linear regression (change in LBP \~ Drug + age + sex + BMI + (1 | clinic))
+
+```{r include=T, warning=F,message=F}
+# models
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Lower Back Pain") %>% 
+  dplyr::select(PAIN_CHANGE, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- lmer(PAIN_CHANGE ~ AGE + SEX + BMI + (1 | CLINIC) + ACETAMINOPHEN,
+            data = dt)
+m1gb <- lmer(PAIN_CHANGE ~ GABA_ANALOGS + AGE + SEX + BMI + (1 | CLINIC),
+            data = dt)
+m1op <- lmer(PAIN_CHANGE ~ OPIOIDS + AGE + SEX + BMI + (1 | CLINIC),
+            data = dt)
+m1ns <- lmer(PAIN_CHANGE ~ NSAIDS + AGE + SEX + BMI + (1 | CLINIC),
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+
+```
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+#### A2. Linear regression (change in NP \~ Drug + age + sex + BMI + (1 | clinic))
+
+```{r include=T, warning=F,message=F}
+# models
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Neuropathic Pain") %>% 
+  dplyr::select(PAIN_CHANGE, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- lmer(PAIN_CHANGE ~ AGE + SEX + BMI + (1 | CLINIC) + ACETAMINOPHEN,
+            data = dt)
+m1gb <- lmer(PAIN_CHANGE ~ GABA_ANALOGS + AGE + SEX + BMI + (1 | CLINIC),
+            data = dt)
+m1op <- lmer(PAIN_CHANGE ~ OPIOIDS + AGE + SEX + BMI + (1 | CLINIC),
+            data = dt)
+m1ns <- lmer(PAIN_CHANGE ~ NSAIDS + AGE + SEX + BMI + (1 | CLINIC),
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+
+```
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+#### B1. Linear regression (follow-up LBP \~ Drug + baseline LBP + age + sex + BMI + (1 | clinic)
+
+```{r include=T, warning=F,message=F}
+# models
+dt <- df %>% dplyr::filter(!is.na(PAIN_CHANGE)) %>% 
+  dplyr::filter(DIAGNOSIS == "Lower Back Pain") %>% 
+  dplyr::select(PAIN_BASELINE, PAIN_FOLLOW_UP, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- lmer(PAIN_FOLLOW_UP ~ AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE + ACETAMINOPHEN,
+            data = dt)
+m1gb <- lmer(PAIN_FOLLOW_UP ~ GABA_ANALOGS + AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE,
+            data = dt)
+m1op <- lmer(PAIN_FOLLOW_UP ~ OPIOIDS + AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE,
+            data = dt)
+m1ns <- lmer(PAIN_FOLLOW_UP ~ NSAIDS + AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE,
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+
+```
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
+```
+
+#### B2. Linear regression (follow-up NP \~ Drug + baseline NP + age + sex + BMI + clinic)
+
+```{r include=T, warning=F,message=F}
+# models
+dt <- df %>% dplyr::filter(!is.na(PAIN_FOLLOW_UP)) %>% 
+  dplyr::filter(DIAGNOSIS == "Neuropathic Pain") %>% 
+  dplyr::select(PAIN_BASELINE, PAIN_FOLLOW_UP, ACETAMINOPHEN, GABA_ANALOGS, 
+         NSAIDS, OPIOIDS, OTHER, AGE, SEX, BMI, CLINIC)
+
+m1ac <- lmer(PAIN_FOLLOW_UP ~ AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE + ACETAMINOPHEN,
+            data = dt)
+m1gb <- lmer(PAIN_FOLLOW_UP ~ GABA_ANALOGS + AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE,
+            data = dt)
+m1op <- lmer(PAIN_FOLLOW_UP ~ OPIOIDS + AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE,
+            data = dt)
+m1ns <- lmer(PAIN_FOLLOW_UP ~ NSAIDS + AGE + SEX + BMI + (1 | CLINIC) + PAIN_BASELINE,
+            data = dt)
+export_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE,
+             error_format = "[{conf.low}, {conf.high}]")
+
+```
+```{r include=T, warning=F,message=F}
+plot_summs(m1ac, m1gb, m1op, m1ns, scale = TRUE, plot.distributions = TRUE)
 ```
 
 ```{r include=T, warning=F,message=F}

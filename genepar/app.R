@@ -88,6 +88,9 @@ ui <- tagList(dashboardPage(title="GENEPAR-1",
                                            dataTableOutput('tbl'),
                                            HTML("<div style='height: 15px;'>"),
                                            HTML("</div>"),
+                                           h2(strong("GENEPAR-1 dataset: Visualizing missing data")),
+                                           plotOutput("pm1", height = 500, width = 1500),
+                                           plotOutput("pm2", height = 1000, width = 1000),
                                            HTML("<div style='display: block;padding-bottom:50px'>"),
                                            HTML("</div>"))))),
                         tabItem(tabName = "uniCon",
@@ -267,6 +270,10 @@ server <- function(input, output) {
     dict <- readxl::read_excel("/home/vverma3/repo/GENEPAR-1/DICTIONARY.xlsx")
     dict
   })
+  
+  output$pm1 <- renderPlot(naniar::vis_miss(df))
+  output$pm2 <- renderPlot(naniar::gg_miss_var(df, show_pct = T)
+                           + theme(aspect.ratio=3/1))                        
   
   output$hist  <- renderPlotly({
     df1 <- df %>% select(input$contVar) %>% 
